@@ -17,7 +17,7 @@ import { TableOfContents } from "@/components/markdoc/table.of.contents"
 import Markdoc from "@markdoc/markdoc"
 
 // Constants
-const CONTENT_DIR = path.join(process.cwd(), "content")
+const CONTENT_DIR = path.join(process.cwd(), "content", "docs")
 
 // Types
 type PageParams = {
