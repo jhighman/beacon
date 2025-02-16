@@ -1,0 +1,28 @@
+BUILD INSTRUCTIONS
+
+Prerequisites
+------------
+- Node.js (latest LTS version recommended)
+- npm or yarn or pnpm (npm is used in these instructions)
+
+Setup
+-----
+
+1. Clone the repository and navigate to the project directory:
+
+git clone <repository-url>
+cd beacon
+
+2. Set execute permissions for the setup scripts:
+
+sudo chmod +x setup.sh setup-content.sh
+# If you don't have sudo access, use:
+# chmod 755 setup.sh setup-content.sh
+
+3. Run the application setup:
+
+./setup.sh
+
+4. (Optional) Install example content:
+
+./setup-content.sh
