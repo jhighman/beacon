@@ -1,136 +1,122 @@
 import fs from "fs"
 import path from "path"
-import * as React from "react"
+import React from "react"
 import { Metadata } from "next"
 import Link from "next/link"
+import Markdoc, {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  RenderableTreeNode,
+  RenderableTreeNodes,
+} from "@markdoc/markdoc"
 import { slugifyWithCounter } from "@sindresorhus/slugify"
 import { globby } from "globby"
 import { ChevronRight } from "lucide-react"
 import { z } from "zod"
 import { parse } from "zod-matter"
 
-
 import { components, config } from "@/config/markdoc.config"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { TableOfContents } from "@/components/markdoc/table.of.contents"
-import Markdoc from "@markdoc/markdoc"
 
-// Constants
-const CONTENT_DIR = path.join(process.cwd(), "content", "docs")
+const CONTENT_DIR = path.join(process.cwd(), "content")
 
-// Types
-type PageParams = {
-  slug: string[] | undefined
+type Params = {
+  slug: string
 }
 
 type PageProps = {
-  params: PageParams
-  searchParams: { [key: string]: string | string[] | undefined }
+  params: Params
 }
 
-type GenerateMetadataProps = {
-  params: PageParams
-  searchParams: { [key: string]: string | string[] | undefined }
-}
-
-interface DocNode {
+type Node = {
   name: string
-  attributes: Record<string, unknown>
-  children?: DocNode[]
+  attributes: { [key: string]: any }
+  children?: Node[]
 }
 
-interface TableOfContentsItem {
-  title: string
-  id: string
-  level: number
-  children: TableOfContentsItem[]
+function getNodeText(node: Node) {
+  let text = ""
+  for (let child of node.children ?? []) {
+    if (typeof child === "string") {
+      text += child
+    }
+    text += getNodeText(child)
+  }
+  return text
 }
 
-// Schema
-const frontmatterSchema = z.object({
-  title: z.string(),
-  toc: z.boolean().optional().default(true),
-})
+function collectHeadings(nodes: Node[], slugify = slugifyWithCounter()) {
+  let sections: any[] = []
 
-// Utilities
-function getNodeText(node: DocNode): string {
-  return (node.children ?? []).reduce((text, child) => {
-    if (typeof child === "string") return text + child
-    return text + getNodeText(child)
-  }, "")
-}
-
-function collectHeadings(nodes: DocNode[]): TableOfContentsItem[] {
-  const slugify = slugifyWithCounter()
-  const sections: TableOfContentsItem[] = []
-
-  for (const node of nodes) {
+  for (let node of nodes) {
     if (node.name === "Heading") {
-      const title = getNodeText(node)
+      let title = getNodeText(node)
       if (title) {
-        const id = slugify(title)
-        const level = node.attributes.level as number
+        let id = slugify(title)
         node.attributes.id = id
-
-        const item = { title, id, level, children: [] }
-
-        if (level > 2) {
-          const parent = sections[sections.length - 1]
-          if (!parent) {
+        if (node.attributes.level > 2) {
+          if (!sections[sections.length - 1]) {
             throw new Error(
-              `Cannot add 'h${level}' to table of contents without a preceding 'h${level - 1}'`
+              `Cannot add 'h${
+                node.attributes.level
+              }' to table of contents without a preceding 'h${
+                node.attributes.level - 1
+              }'`
             )
           }
-          parent.children.push(item)
+          sections[sections.length - 1].children.push({
+            ...node.attributes,
+            title,
+          })
         } else {
-          sections.push(item)
+          sections.push({ ...node.attributes, title, children: [] })
         }
       }
     }
 
-    if (node.children?.length) {
-      sections.push(...collectHeadings(node.children))
-    }
+    sections.push(...collectHeadings(node.children ?? [], slugify))
   }
 
   return sections
 }
 
-async function getMarkdownContent(slug: string) {
-  const filePath = path.join(CONTENT_DIR, `${slug}.md`)
+// Based on https://github.com/jonschlinkert/gray-matter/issues/135#issuecomment-1372552007
+const frontmatterDefinition = z.object({
+  title: z.string(),
+  toc: z.boolean().optional().default(true),
+})
+
+export const dynamicParams = false
+
+export async function generateStaticParams() {
+  const contentPaths = await globby(path.join(CONTENT_DIR), {
+    expandDirectories: { extensions: ["md"] },
+  })
+  return contentPaths.map((contentPath) => {
+    return { slug: path.basename(contentPath, path.extname(contentPath)) }
+  })
+}
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { title } = await getMarkdownContent(params.slug)
+  return { title: title }
+}
+
+async function getMarkdownContent(slug: string | undefined) {
+  const filePath = path.join(CONTENT_DIR, slug + ".md")
   const source = fs.readFileSync(filePath, "utf-8")
-  const { data: frontmatter } = parse(source, frontmatterSchema)
+  const { data: frontmatter } = parse(source, frontmatterDefinition)
   const ast = Markdoc.parse(source)
   const content = Markdoc.transform(ast, config)
   return { content, ...frontmatter }
 }
 
-// Next.js Configuration
-export const dynamicParams = true
-
-export async function generateStaticParams(): Promise<PageParams[]> {
-  const contentPaths = await globby(CONTENT_DIR, {
-    expandDirectories: { extensions: ["md"] },
-  })
-  return contentPaths.map((contentPath) => ({
-    slug: [path.basename(contentPath, path.extname(contentPath))],
-  }))
-}
-
-export async function generateMetadata(
-  { params }: GenerateMetadataProps
-): Promise<Metadata> {
-  const slug = params.slug?.[0] ?? 'index'
-  const { title } = await getMarkdownContent(slug)
-  return { title }
-}
-
-// Page Component
-export default async function DocsPage({ params }: PageProps) {
-  const slug = params.slug?.[0] ?? 'index'
-  const { title, toc, content } = await getMarkdownContent(slug)
-  const tableOfContents = toc ? collectHeadings([content] as DocNode[]) : []
+export default async function ContentPage({ params }: PageProps) {
+  const { title, toc, content } = await getMarkdownContent(params.slug)
+  const tableOfContents = toc ? collectHeadings([content] as Node[]) : []
 
   return (
     <main className="container relative py-6 lg:gap-10 lg:py-8 xl:grid xl:grid-cols-[1fr_300px]">
@@ -151,17 +137,13 @@ export default async function DocsPage({ params }: PageProps) {
         <div className="pb-12 pt-8">
           {Markdoc.renderers.react(content, React, { components })}
         </div>
+        {/* <DocsPager doc={doc} /> */}
       </div>
       {toc && (
         <div className="hidden text-sm xl:block">
-          <div className="sticky top-16 -mt-10 h-[calc(100vh-3.5rem)] overflow-hidden border-l pt-6">
+          <div className="sticky top-16 -mt-10 h-[calc(100vh-3.5rem)] overflow-hidden border-l pt-6 ">
             <ScrollArea className="pb-10 pl-10">
-              <TableOfContents 
-                items={tableOfContents.map(item => ({
-                  ...item,
-                  url: item.id
-                }))} 
-              />
+              <TableOfContents toc={tableOfContents} />
             </ScrollArea>
           </div>
         </div>

@@ -3,7 +3,7 @@ import animate from 'tailwindcss-animate';
 import typography from '@tailwindcss/typography';
 
 const config: Config = {
-  darkMode: ["class", "dark"],
+  darkMode: "class", // ✅ Ensure Tailwind dark mode is applied via class
   content: [
     './app/**/*.{js,ts,jsx,tsx,md,mdoc,css}',
     './pages/**/*.{js,ts,jsx,tsx,md,mdoc,css}',
@@ -12,13 +12,6 @@ const config: Config = {
     './markdoc/**/*.{js,ts,jsx,tsx,md,mdoc,css}',
   ],
   theme: {
-    container: {
-      center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
-    },
     extend: {
       colors: {
         background: {
@@ -29,10 +22,6 @@ const config: Config = {
         },
         border: {
           DEFAULT: 'hsl(var(--border))',
-        },
-        zinc: {
-          200: '#e4e4e7',
-          800: '#27272a',
         },
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -74,35 +63,9 @@ const config: Config = {
           '700': '#424770'
         },
       },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-      fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        mono: ['Inter', 'monospace'],
-      },
-      keyframes: {
-        "accordion-down": {
-          from: { height: '0' },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: '0' },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-      },
     },
   },
-  plugins: [
-    animate,
-    typography,
-  ],
+  plugins: [animate, typography],
 };
 
 export default config;
